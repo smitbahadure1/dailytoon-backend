@@ -1,0 +1,11 @@
+fastapi==0.110.1
+uvicorn==0.25.0
+motor==3.3.1
+python-dotenv==1.2.1
+pydantic==2.12.4
+httpx==0.28.1
+pymongo==4.6.3
+certifi>=2023.7.22
+
+# Google AI
+google-generativeai>=0.8.0
