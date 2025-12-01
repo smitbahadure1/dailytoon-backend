@@ -20,32 +20,43 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
+# MongoDB connection
 mongo_url = os.environ.get('MONGO_URL')
 if not mongo_url:
-    raise ValueError("MONGO_URL environment variable is required")
+    print("WARNING: MONGO_URL environment variable is not set")
+    mongo_url = "mongodb://localhost:27017" # Fallback for local testing if needed
 
-# Add retryWrites to the connection string
-if '?' in mongo_url:
-    mongo_url += '&retryWrites=true'
-else:
+# Add retryWrites to the connection string if it's a cloud URI
+if mongo_url.startswith("mongodb+srv://") and '?' not in mongo_url:
     mongo_url += '?retryWrites=true'
+elif mongo_url.startswith("mongodb+srv://") and '?' in mongo_url and 'retryWrites' not in mongo_url:
+    mongo_url += '&retryWrites=true'
+
+client = None
+db = None
 
 # Try to connect with different SSL options for deployment compatibility
 try:
+    print(f"Attempting to connect to MongoDB...")
     client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
+    # Verify connection
+    # await client.admin.command('ping') # Can't await at module level easily
+    print("MongoDB client initialized")
 except Exception as ssl_error:
     print(f"Primary MongoDB connection failed: {ssl_error}")
     try:
         # Fallback without certificate verification (for some environments)
         client = AsyncIOMotorClient(mongo_url, tlsAllowInvalidCertificates=True)
+        print("Fallback MongoDB client initialized")
     except Exception as fallback_error:
         print(f"Fallback MongoDB connection failed: {fallback_error}")
-        # If both fail, the app will raise the error when trying to use the database
+        # We don't raise here to allow the app to start, but DB ops will fail
 
-DB_NAME = os.environ.get('DB_NAME')
-if not DB_NAME:
-    raise ValueError("DB_NAME environment variable is required")
-db = client[DB_NAME]
+DB_NAME = os.environ.get('DB_NAME', 'dailytoon')
+if client:
+    db = client[DB_NAME]
+else:
+    print("CRITICAL: Could not initialize MongoDB client. Database operations will fail.")
 
 # Create the main app
 app = FastAPI()
