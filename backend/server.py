@@ -200,9 +200,9 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
     Generate a manga-style image using Pollinations.ai (Free API).
     Returns base64 encoded image.
     """
-    # Retry configuration
-    max_retries = 3
-    base_delay = 2
+    # Retry configuration for rate limits
+    max_retries = 5
+    base_delay = 5  # Start with 5 seconds
     
     last_error = None
     
@@ -217,29 +217,39 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
             
             logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
             
-            # Increased timeout to 60 seconds for slower connections/cold starts
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            # Increased timeout to 90 seconds for slower connections/cold starts
+            async with httpx.AsyncClient(timeout=90.0) as client:
                 response = await client.get(image_url)
                 if response.status_code == 200:
                     image_bytes = response.content
                     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
                     return image_base64
+                elif response.status_code == 429:
+                    logger.warning(f"Pollinations API rate limit (429) on attempt {attempt + 1}")
+                    # Force retry for 429
+                    raise HTTPException(status_code=429, detail="Rate limit exceeded")
                 else:
                     logger.warning(f"Pollinations API returned {response.status_code}")
                     if response.status_code >= 500:
                         # Server error, retry
                         raise HTTPException(status_code=500, detail=f"Pollinations API error: {response.status_code}")
                     else:
-                        # Client error, don't retry
+                        # Client error (other than 429), don't retry
                         raise HTTPException(status_code=response.status_code, detail=f"Pollinations API error: {response.status_code}")
                 
         except Exception as e:
             last_error = e
             logger.error(f"Error generating image (Attempt {attempt + 1}): {str(e)}")
-            if attempt < max_retries - 1:
+            
+            # Check if we should retry
+            should_retry = attempt < max_retries - 1
+            
+            if should_retry:
                 import asyncio
-                delay = base_delay * (2 ** attempt)  # Exponential backoff
-                logger.info(f"Retrying in {delay} seconds...")
+                # Exponential backoff with jitter: delay * 2^attempt + random(0-1s)
+                jitter = random.random()
+                delay = (base_delay * (2 ** attempt)) + jitter
+                logger.info(f"Retrying in {delay:.2f} seconds...")
                 await asyncio.sleep(delay)
             
     # If we get here, all retries failed
