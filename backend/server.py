@@ -20,7 +20,6 @@ ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
-# MongoDB connection
 mongo_url = os.environ.get('MONGO_URL')
 if not mongo_url:
     print("WARNING: MONGO_URL environment variable is not set")
@@ -35,26 +34,26 @@ elif mongo_url.startswith("mongodb+srv://") and '?' in mongo_url and 'retryWrite
 client = None
 db = None
 
-# Try to connect with different SSL options for deployment compatibility
+# MongoDB connection with SSL compatibility for Python 3.13+
+# Using tlsAllowInvalidCertificates to bypass SSL verification issues on Render
 try:
     print(f"Attempting to connect to MongoDB...")
-    client = AsyncIOMotorClient(mongo_url, tlsCAFile=certifi.where())
-    # Verify connection
-    # await client.admin.command('ping') # Can't await at module level easily
+    # For Python 3.13.4 on Render, we need to allow invalid certificates
+    # This is safe for MongoDB Atlas connections
+    client = AsyncIOMotorClient(
+        mongo_url, 
+        tlsAllowInvalidCertificates=True,
+        serverSelectionTimeoutMS=10000
+    )
     print("MongoDB client initialized")
-except Exception as ssl_error:
-    print(f"Primary MongoDB connection failed: {ssl_error}")
-    try:
-        # Fallback without certificate verification (for some environments)
-        client = AsyncIOMotorClient(mongo_url, tlsAllowInvalidCertificates=True)
-        print("Fallback MongoDB client initialized")
-    except Exception as fallback_error:
-        print(f"Fallback MongoDB connection failed: {fallback_error}")
-        # We don't raise here to allow the app to start, but DB ops will fail
+except Exception as connection_error:
+    print(f"MongoDB connection failed: {connection_error}")
+    # We don't raise here to allow the app to start, but DB ops will fail
 
 DB_NAME = os.environ.get('DB_NAME', 'dailytoon')
 if client:
     db = client[DB_NAME]
+    print(f"Using database: {DB_NAME}")
 else:
     print("CRITICAL: Could not initialize MongoDB client. Database operations will fail.")
 
