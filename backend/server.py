@@ -201,56 +201,48 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
     Generate a manga-style image using Pollinations.ai (Free API).
     Returns base64 encoded image.
     """
-    # Retry configuration for rate limits
-    max_retries = 5
-    base_delay = 5  # Start with 5 seconds
+    # Retry configuration for rate limits (Reduced for speed)
+    max_retries = 3
+    base_delay = 5
     
     last_error = None
     
     for attempt in range(max_retries):
         try:
+            # Use 'turbo' model for speed and 512x512 resolution
             base_prompt = f"manga style comic panel, black and white, screentones, {scene_description}, character {character_profile}, setting {background}, mood {dialogue}, high quality, detailed line art"
             encoded_prompt = urllib.parse.quote(base_prompt)
             
             # Add random seed to avoid caching issues
             seed = uuid.uuid4().int % 100000
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true"
+            # Explicitly requesting turbo model for speed
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true&model=turbo"
             
             logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
             
-            # Increased timeout to 90 seconds for slower connections/cold starts
-            async with httpx.AsyncClient(timeout=120.0) as client:
-
+            # Timeout 60s per request to avoid hanging
+            async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.get(image_url)
                 if response.status_code == 200:
                     image_bytes = response.content
                     image_base64 = base64.b64encode(image_bytes).decode('utf-8')
                     return image_base64
                 elif response.status_code == 429:
-                    logger.warning(f"Pollinations API rate limit (429) on attempt {attempt + 1}")
-                    # Force retry for 429
-                    raise HTTPException(status_code=429, detail="Rate limit exceeded")
+                    logger.warning(f"Pollinations API rate limit (429). Retrying...")
+                    await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
                 else:
                     logger.warning(f"Pollinations API returned {response.status_code}")
+                    # For 500/502/503 errors, we should also retry
                     if response.status_code >= 500:
-                        # Server error, retry
-                        raise HTTPException(status_code=500, detail=f"Pollinations API error: {response.status_code}")
+                        await asyncio.sleep(base_delay)
                     else:
-                        # Client error (other than 429), don't retry
-                        raise HTTPException(status_code=response.status_code, detail=f"Pollinations API error: {response.status_code}")
-                
-        except Exception as e:
+                        raise HTTPException(status_code=500, detail=f"Pollinations API error: {response.status_code}")
+                        
+        except httpx.RequestError as e:
+            logger.error(f"Request error: {e}")
             last_error = e
-            logger.error(f"Error generating image (Attempt {attempt + 1}): {str(e)}")
-            
-            # Check if we should retry
-            should_retry = attempt < max_retries - 1
-            
-            if should_retry:
-                import asyncio
-                # Exponential backoff with jitter: delay * 2^attempt + random(0-1s)
-                jitter = random.random()
-                delay = (base_delay * (2 ** attempt)) + jitter
+            await asyncio.sleep(base_delay)
+        except Exception as e:
                 logger.info(f"Retrying in {delay:.2f} seconds...")
                 await asyncio.sleep(delay)
             

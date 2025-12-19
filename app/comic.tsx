@@ -44,7 +44,7 @@ export default function ComicScreen() {
       // Auto-generate images for panels without images sequentially
       for (const panel of data.panels) {
         if (!panel.image_base64) {
-          await generatePanelImage(panel.panel_id);
+          await generatePanelImage(panel.panel_id, true);
         }
       }
     } catch (error) {
@@ -55,7 +55,7 @@ export default function ComicScreen() {
     }
   };
 
-  const generatePanelImage = async (panelId: string) => {
+  const generatePanelImage = async (panelId: string, isAuto: boolean = false) => {
     setGeneratingPanels(prev => new Set(prev).add(panelId));
 
     try {
@@ -107,7 +107,9 @@ export default function ComicScreen() {
         errorMessage = 'Server is having trouble. Please try again in a moment.';
       }
 
-      Alert.alert('Generation Failed', errorMessage);
+      if (!isAuto) {
+        Alert.alert('Generation Failed', errorMessage);
+      }
     } finally {
       setGeneratingPanels(prev => {
         const newSet = new Set(prev);
