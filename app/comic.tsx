@@ -41,11 +41,11 @@ export default function ComicScreen() {
       const data = await response.json();
       setEpisode(data);
 
-      // Auto-generate images for panels without images in chunks of 2
-      const panelsToGenerate = data.panels.filter((p: any) => !p.image_base64);
-      for (let i = 0; i < panelsToGenerate.length; i += 3) {
-        const chunk = panelsToGenerate.slice(i, i + 3);
-        await Promise.all(chunk.map((p: any) => generatePanelImage(p.panel_id)));
+      // Auto-generate images for panels without images sequentially
+      for (const panel of data.panels) {
+        if (!panel.image_base64) {
+          await generatePanelImage(panel.panel_id);
+        }
       }
     } catch (error) {
       console.error('Error loading episode:', error);

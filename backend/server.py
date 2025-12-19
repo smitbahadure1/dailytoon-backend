@@ -266,7 +266,7 @@ async def health_check():
 
 @api_router.get("/")
 async def root():
-    return {"message": "DailyToon API", "status": "running", "version": "1.0.1"}
+    return {"message": "DailyToon API", "status": "running", "version": "1.0.2"}
 
 @api_router.post("/story/submit", response_model=StoryboardResponse)
 async def submit_story(story_input: StorySubmit):
