@@ -17,6 +17,7 @@ import json
 import re
 import certifi
 import random
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
