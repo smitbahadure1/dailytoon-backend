@@ -199,56 +199,21 @@ Format as JSON:
 
 async def generate_manga_image_pollinations(scene_description: str, dialogue: str, character_profile: str, background: str) -> str:
     """
-    Generate a manga-style image using Pollinations.ai (Free API).
-    Returns base64 encoded image.
+    Generate a manga-style image URL using Pollinations.ai (Free API).
+    Returns the Image URL directly for client-side loading.
     """
-    # Retry configuration for rate limits (Default model for stability)
-    max_retries = 3
-    base_delay = 10  # Increased delay for stability
+    # Standard prompt
+    base_prompt = f"manga style comic panel, black and white, screentones, {scene_description}, character {character_profile}, setting {background}, mood {dialogue}, high quality, detailed line art"
+    encoded_prompt = urllib.parse.quote(base_prompt)
     
-    last_error = None
+    # Add random seed
+    seed = uuid.uuid4().int % 100000
     
-    for attempt in range(max_retries):
-        try:
-            # Use default model for better stability
-            base_prompt = f"manga style comic panel, black and white, screentones, {scene_description}, character {character_profile}, setting {background}, mood {dialogue}, high quality, detailed line art"
-            encoded_prompt = urllib.parse.quote(base_prompt)
-            
-            # Add random seed to avoid caching issues
-            seed = uuid.uuid4().int % 100000
-            # Removed model=turbo
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true"
-            
-            logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
-            
-            # Timeout 60s per request
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.get(image_url)
-                if response.status_code == 200:
-                    image_bytes = response.content
-                    image_base64 = base64.b64encode(image_bytes).decode('utf-8')
-                    return image_base64
-                elif response.status_code == 429:
-                    logger.warning(f"Pollinations API rate limit (429). Retrying...")
-                    await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
-                else:
-                    logger.warning(f"Pollinations API returned {response.status_code}")
-                    if response.status_code >= 500:
-                        await asyncio.sleep(base_delay)
-                    else:
-                        raise HTTPException(status_code=500, detail=f"Pollinations API error: {response.status_code}")
-                        
-        except httpx.RequestError as e:
-            logger.error(f"Request error: {e}")
-            last_error = e
-            await asyncio.sleep(base_delay)
-        except Exception as e:
-            logger.error(f"Unexpected error: {e}")
-            last_error = e
-            await asyncio.sleep(base_delay)
-            
-    logger.error(f"Error generating image after {max_retries} attempts")
-    raise HTTPException(status_code=500, detail=f"Image generation failed after {max_retries} attempts: {str(last_error)}")
+    # Return URL immediately (Client will fetch). Using 384x384 for mobile speed.
+    image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=384&height=384&seed={seed}&nologo=true"
+    
+    logger.info(f"Generated Pollinations URL: {image_url}")
+    return image_url
 
 # ========== API ENDPOINTS ==========
 

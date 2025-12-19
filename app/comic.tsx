@@ -59,9 +59,9 @@ export default function ComicScreen() {
     setGeneratingPanels(prev => new Set(prev).add(panelId));
 
     try {
-      // Set a timeout for the fetch request (180 seconds to account for cold starts and queues)
+      // Server now returns URL instantly, but we keep a reasonable timeout for network RTT
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(`${BACKEND_URL}/api/panels/generate`, {
         method: 'POST',
@@ -172,7 +172,11 @@ export default function ComicScreen() {
               <View style={styles.imageContainer}>
                 {panel.image_base64 ? (
                   <Image
-                    source={{ uri: `data:image/png;base64,${panel.image_base64}` }}
+                    source={{
+                      uri: panel.image_base64.startsWith('http')
+                        ? panel.image_base64
+                        : `data:image/png;base64,${panel.image_base64}`
+                    }}
                     style={styles.panelImage}
                     resizeMode="contain"
                   />
