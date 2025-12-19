@@ -201,26 +201,26 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
     Generate a manga-style image using Pollinations.ai (Free API).
     Returns base64 encoded image.
     """
-    # Retry configuration for rate limits (Reduced for speed)
+    # Retry configuration for rate limits (Default model for stability)
     max_retries = 3
-    base_delay = 5
+    base_delay = 10  # Increased delay for stability
     
     last_error = None
     
     for attempt in range(max_retries):
         try:
-            # Use 'turbo' model for speed and 512x512 resolution
+            # Use default model for better stability
             base_prompt = f"manga style comic panel, black and white, screentones, {scene_description}, character {character_profile}, setting {background}, mood {dialogue}, high quality, detailed line art"
             encoded_prompt = urllib.parse.quote(base_prompt)
             
             # Add random seed to avoid caching issues
             seed = uuid.uuid4().int % 100000
-            # Explicitly requesting turbo model for speed
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true&model=turbo"
+            # Removed model=turbo
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true"
             
             logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
             
-            # Timeout 60s per request to avoid hanging
+            # Timeout 60s per request
             async with httpx.AsyncClient(timeout=60.0) as client:
                 response = await client.get(image_url)
                 if response.status_code == 200:
@@ -232,7 +232,6 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
                     await asyncio.sleep(base_delay * (2 ** attempt))  # Exponential backoff
                 else:
                     logger.warning(f"Pollinations API returned {response.status_code}")
-                    # For 500/502/503 errors, we should also retry
                     if response.status_code >= 500:
                         await asyncio.sleep(base_delay)
                     else:
@@ -243,10 +242,11 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
             last_error = e
             await asyncio.sleep(base_delay)
         except Exception as e:
-                logger.info(f"Retrying in {delay:.2f} seconds...")
-                await asyncio.sleep(delay)
+            logger.error(f"Unexpected error: {e}")
+            last_error = e
+            await asyncio.sleep(base_delay)
             
-    # If we get here, all retries failed
+    logger.error(f"Error generating image after {max_retries} attempts")
     raise HTTPException(status_code=500, detail=f"Image generation failed after {max_retries} attempts: {str(last_error)}")
 
 # ========== API ENDPOINTS ==========
