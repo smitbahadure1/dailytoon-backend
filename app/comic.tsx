@@ -41,11 +41,11 @@ export default function ComicScreen() {
       const data = await response.json();
       setEpisode(data);
 
-      // Auto-generate images for panels without images
-      for (const panel of data.panels) {
-        if (!panel.image_base64) {
-          generatePanelImage(panel.panel_id);
-        }
+      // Auto-generate images for panels without images in chunks of 2
+      const panelsToGenerate = data.panels.filter((p: any) => !p.image_base64);
+      for (let i = 0; i < panelsToGenerate.length; i += 2) {
+        const chunk = panelsToGenerate.slice(i, i + 2);
+        await Promise.all(chunk.map((p: any) => generatePanelImage(p.panel_id)));
       }
     } catch (error) {
       console.error('Error loading episode:', error);
@@ -59,9 +59,9 @@ export default function ComicScreen() {
     setGeneratingPanels(prev => new Set(prev).add(panelId));
 
     try {
-      // Set a timeout for the fetch request (90 seconds to account for cold starts)
+      // Set a timeout for the fetch request (180 seconds to account for cold starts and queues)
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 90000);
+      const timeoutId = setTimeout(() => controller.abort(), 180000);
 
       const response = await fetch(`${BACKEND_URL}/api/panels/generate`, {
         method: 'POST',

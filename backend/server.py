@@ -16,6 +16,7 @@ import urllib.parse
 import json
 import re
 import certifi
+import random
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -213,12 +214,13 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
             
             # Add random seed to avoid caching issues
             seed = uuid.uuid4().int % 100000
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&seed={seed}&nologo=true"
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={seed}&nologo=true&model=flux"
             
             logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
             
             # Increased timeout to 90 seconds for slower connections/cold starts
-            async with httpx.AsyncClient(timeout=90.0) as client:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+
                 response = await client.get(image_url)
                 if response.status_code == 200:
                     image_bytes = response.content
