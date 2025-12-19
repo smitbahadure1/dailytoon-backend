@@ -214,7 +214,7 @@ async def generate_manga_image_pollinations(scene_description: str, dialogue: st
             
             # Add random seed to avoid caching issues
             seed = uuid.uuid4().int % 100000
-            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=768&height=768&seed={seed}&nologo=true&model=flux"
+            image_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=512&height=512&seed={seed}&nologo=true"
             
             logger.info(f"Generating image with Pollinations.ai (Attempt {attempt + 1}/{max_retries})")
             
